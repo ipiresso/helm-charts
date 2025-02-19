@@ -36,19 +36,8 @@ spec:
         {{- toYaml .Values.sourceController.initContainers | nindent 8}}
       {{- end}}
       containers:
-      - args:
-        {{- if .Values.notificationController.create }}
-        - --events-addr=http://notification-controller.$(RUNTIME_NAMESPACE).svc.{{ .Values.clusterDomain | default "cluster.local" }}.
-        {{- end}}
-        - --watch-all-namespaces={{ .Values.watchAllNamespaces }}
-        - --log-level={{ .Values.logLevel | default "info" }}
-        - --log-encoding=json
-        - --enable-leader-election
-        - --storage-path=/data
-        - --storage-adv-addr=source-controller.$(RUNTIME_NAMESPACE).svc.{{ .Values.clusterDomain | default "cluster.local" }}.
-        {{- range .Values.sourceController.container.additionalArgs }}
-        - {{ . }}
-        {{- end}}
+      - command: ["/bin/sh"]
+        args: ["-c", "source-controller {{- if .Values.notificationController.create }} --events-addr=http://notification-controller.$(RUNTIME_NAMESPACE).svc.{{ .Values.clusterDomain | default "cluster.local" }}. {{- end}} --watch-all-namespaces={{ .Values.watchAllNamespaces }} --log-level={{ .Values.logLevel | default "info" }} --log-encoding={{ .Values.logEncoding | default "json" }} --enable-leader-election --storage-path=/data --storage-adv-addr=source-controller.$(RUNTIME_NAMESPACE).svc.{{ .Values.clusterDomain | default "cluster.local" }}. {{ .Values.sourceController.container.additionalArgs }}"]
         env:
         - name: RUNTIME_NAMESPACE
           valueFrom:
@@ -67,6 +56,9 @@ spec:
           httpGet:
             path: /healthz
             port: healthz
+          {{- if and .Values.sourceController.livenessProbe .Values.sourceController.livenessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ .Values.sourceController.livenessProbe.timeoutSeconds }}
+          {{- end }}
         name: manager
         ports:
         - containerPort: 9090
@@ -82,6 +74,9 @@ spec:
           httpGet:
             path: /
             port: http
+          {{- if and .Values.sourceController.readinessProbe .Values.sourceController.readinessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ .Values.sourceController.readinessProbe.timeoutSeconds }}
+          {{- end }}
         {{- with .Values.sourceController.resources }}
         resources: {{ toYaml . | nindent 10 }}
         {{- end }}
